@@ -1,5 +1,3 @@
-module Main where
-
 module JSRS where
 
 type JField = (String, JValue)
