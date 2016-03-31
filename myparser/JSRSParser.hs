@@ -1,4 +1,6 @@
---import Data.Map.StringMap as M
+module JSRSParser(readJSRS
+                 ,readJValue
+  ) where
 
 import ParserSettings(validateFieldName
                      ,dropWhileWhiteSpace
@@ -12,18 +14,13 @@ import Data.List(isPrefixOf)
 import Data.Maybe(fromJust)
 import Data.Char(isDigit)
 
+import Data.Time.Clock
+
 import Control.Applicative(liftA2)
 
-type JField = (String, JValue)
-type JObject = [JField]
+import JSRS
 
-data JValue = JObj JObject
-            | JArray [JValue]
-            | JNumber Float
-            | JString String
-            | JBool Bool
-            | JUndefined
-        deriving (Show)
+
 readJSRS :: String -> Either String JObject
 readJSRS = fmap fst . readJSRSRest
 
@@ -117,6 +114,7 @@ readField str = do
         return ((fieldName, fieldVal), rest')
     where str' = dropWhileWhiteSpace str
 
+
 readFieldName :: String -> Either String (String, String)
 readFieldName str = if validateFieldName fieldName
                   then Right (fieldName, rest)
@@ -133,7 +131,3 @@ mapFst fn (a, b) = (fn a, b)
 
 addResult :: Either a (b, c) -> Either a ([b], c) -> Either a ([b], c)
 addResult = liftA2 (\(x,_) -> mapFst (x:))
-
-main = do
-    json <- readFile "../example.jsrs"
-    print $ readJSRS json
