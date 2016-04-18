@@ -1,7 +1,7 @@
 module JSRS where
 
-type JField = (String, JValue)
-type JObject = [JField]
+newtype JField = JField (String, JValue)
+newtype JObject = JObject [JField]
 
 data JValue = JObj JObject
             | JArray [JValue]
@@ -9,4 +9,3 @@ data JValue = JObj JObject
             | JString String
             | JBool Bool
             | JUndefined
-        deriving (Show)

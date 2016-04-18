@@ -10,9 +10,12 @@ import ParserSettings(validateFieldName
                      ,slashCombos
                      ,valueSeps
                      )
+
 import Data.List(isPrefixOf)
 import Data.Maybe(fromJust)
 import Data.Char(isDigit)
+
+import JSRSShow
 
 import Data.Time.Clock
 
@@ -33,13 +36,13 @@ readJSRSRest str = case str' of
 
 readFields :: String -> Either String (JObject, String)
 readFields str = case str' of
-        '}':rest -> Right ([], rest)
+        '}':rest -> Right (JObject [], rest)
         _        -> do
             (field, str'') <- readField str'
             case dropWhileWhiteSpace str'' of
-                '}':rest -> Right ([field], rest)
+                '}':rest -> Right (JObject [field], rest)
                 ch:rest  -> if elem ch fieldSeps
-                            then fmap (mapFst (field:)) (readFields rest)
+                            then fmap (mapFst (addField field)) (readFields rest)
                             else Left "Wrong field separator"
                 _        -> Left "Must be close figure bracket"
     where str' = dropWhileWhiteSpace str
@@ -111,7 +114,7 @@ readField str = do
         (fieldName, rest) <- readFieldName str' 
         rest' <- dropNameValSeparator rest
         (fieldVal, rest') <- readFieldValue rest'
-        return ((fieldName, fieldVal), rest')
+        return (JField (fieldName, fieldVal), rest')
     where str' = dropWhileWhiteSpace str
 
 
@@ -129,5 +132,5 @@ readFieldValue = readJValueRest . dropWhileWhiteSpace
 mapFst :: (a -> c) -> (a, b) -> (c, b)
 mapFst fn (a, b) = (fn a, b)
 
-addResult :: Either a (b, c) -> Either a ([b], c) -> Either a ([b], c)
-addResult = liftA2 (\(x,_) -> mapFst (x:))
+addField :: JField -> JObject -> JObject
+addField field (JObject fields) = JObject (field:fields)  

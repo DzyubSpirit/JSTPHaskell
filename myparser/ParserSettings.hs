@@ -23,7 +23,7 @@ slashCombos = []
 validateFieldName :: String -> Bool
 validateFieldName [] = False
 validateFieldName str = all (uncurry elem) (zip str filterForWord)
-                           
+                
 
 dropWhileWhiteSpace :: String -> String
 dropWhileWhiteSpace = dropWhile (`elem` whiteSpaceChars)
