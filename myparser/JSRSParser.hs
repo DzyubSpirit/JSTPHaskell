@@ -1,6 +1,6 @@
 module JSRSParser(readJSRS
                  ,readJValue
-  ) where
+                 ) where
 
 import ParserSettings(validateFieldName
                      ,dropWhileWhiteSpace
@@ -14,12 +14,6 @@ import ParserSettings(validateFieldName
 import Data.List(isPrefixOf)
 import Data.Maybe(fromJust)
 import Data.Char(isDigit)
-
-import JSRSShow
-
-import Data.Time.Clock
-
-import Control.Applicative(liftA2)
 
 import JSRS
 
@@ -44,7 +38,6 @@ readFields str = case str' of
                 ch:rest  -> if elem ch fieldSeps
                             then fmap (mapFst (addField field)) (readFields rest)
                             else Left "Wrong field separator"
-                _        -> Left "Must be close figure bracket"
     where str' = dropWhileWhiteSpace str
 
 
