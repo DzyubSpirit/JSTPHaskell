@@ -1,4 +1,4 @@
-module ParserSettings 
+module JSRS.ParserSettings 
     ( validateFieldName
     , dropWhileWhiteSpace 
     , nameValSeps
@@ -14,9 +14,8 @@ fieldSeps = [',']
 valueSeps = [',']
 ------
 engLetters = ['a'..'z']++['A'..'Z']
-firstChar = engLetters
 otherChars = ['0'..'9']++engLetters
-filterForWord = firstChar:(repeat otherChars) 
+filterForWord = repeat otherChars 
 ------
 slashCombos = []
 ------

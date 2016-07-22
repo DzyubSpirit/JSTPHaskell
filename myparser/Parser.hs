@@ -1,21 +1,22 @@
-module JSRSParser(readJSRS
-                 ,readJValue
-                 ) where
+module JSRS.Parser(readJSRS
+                  ,readJValue
+                  ) where
 
-import ParserSettings(validateFieldName
-                     ,dropWhileWhiteSpace
-                     ,nameValSeps
-                     ,fieldSeps
-                     ,whiteSpaceChars
-                     ,slashCombos
-                     ,valueSeps
-                     )
+import JSRS.ParserSettings(validateFieldName
+                          ,dropWhileWhiteSpace
+                          ,nameValSeps
+                          ,fieldSeps
+                          ,whiteSpaceChars
+                          ,slashCombos
+                          ,valueSeps
+                          )
 
 import Data.List(isPrefixOf)
 import Data.Maybe(fromJust)
 import Data.Char(isDigit)
+import Control.DeepSeq
 
-import JSRS
+import JSRS.JSRS
 
 
 readJSRS :: String -> Either String JObject
@@ -36,7 +37,7 @@ readFields str = case str' of
             case dropWhileWhiteSpace str'' of
                 '}':rest -> Right (JObject [field], rest)
                 ch:rest  -> if elem ch fieldSeps
-                            then fmap (mapFst (addField field)) (readFields rest)
+                            then fmap (mapFst (addField field).seqId) (readFields rest)
                             else Left "Wrong field separator"
     where str' = dropWhileWhiteSpace str
 
@@ -62,7 +63,7 @@ readJValueRest str2
         numberStr = getNumber False str
         getNumber wasDot [] = []
         getNumber wasDot (x:str) = 
-            if isDigit x
+            if isDigit x || x == '-'
             then x:(getNumber wasDot str)
             else if x == '.'
                  then if wasDot 
@@ -107,7 +108,7 @@ readField str = do
         (fieldName, rest) <- readFieldName str' 
         rest' <- dropNameValSeparator rest
         (fieldVal, rest') <- readFieldValue rest'
-        return (JField (fieldName, fieldVal), rest')
+        return ((fieldName, fieldVal), rest')
     where str' = dropWhileWhiteSpace str
 
 
@@ -127,3 +128,6 @@ mapFst fn (a, b) = (fn a, b)
 
 addField :: JField -> JObject -> JObject
 addField field (JObject fields) = JObject (field:fields)  
+
+seqId :: (NFData a) => a -> a
+seqId x = deepseq x x 
