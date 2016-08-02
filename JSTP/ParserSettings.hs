@@ -1,4 +1,4 @@
-module JSRS.ParserSettings 
+module JSTP.ParserSettings 
     ( validateFieldName
     , dropWhileWhiteSpace 
     , nameValSeps

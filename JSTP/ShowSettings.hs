@@ -1,4 +1,4 @@
-module ShowSettings where
+module JSTP.ShowSettings where
 
 import Data.List(intercalate)
 
@@ -8,9 +8,9 @@ data ArrayDecorator = ArrayDecorator {
     separator :: String
 }
 
-decorateArray :: (Show a) => ArrayDecorator -> [a] -> String
-decorateArray dec arr = (start dec) ++ arrStr ++ (end dec)
-    where arrStr = intercalate (separator dec) $ map show arr
+decorateArray :: ArrayDecorator -> (a -> String) -> [a] -> String
+decorateArray dec showFunc arr = (start dec) ++ arrStr ++ (end dec)
+    where arrStr = intercalate (separator dec) $ map showFunc arr
 
 arrayDecorator = ArrayDecorator {
     start = "[",

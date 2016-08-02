@@ -1,8 +1,8 @@
-module JSRS.Parser(readJSRS
+module JSTP.Parser(readJSRS
                   ,readJValue
                   ) where
 
-import JSRS.ParserSettings(validateFieldName
+import JSTP.ParserSettings(validateFieldName
                           ,dropWhileWhiteSpace
                           ,nameValSeps
                           ,fieldSeps
@@ -14,44 +14,47 @@ import JSRS.ParserSettings(validateFieldName
 import Data.List(isPrefixOf)
 import Data.Maybe(fromJust)
 import Data.Char(isDigit)
+import qualified Data.Map as M
 import Control.DeepSeq
 
-import JSRS.JSRS
+import JSTP.JSRS
+import JSTP.Errors
 
-
-readJSRS :: String -> Either String JObject
+readJSRS :: String -> WithError JObject
 readJSRS = fmap fst . readJSRSRest
 
-readJSRSRest :: String -> Either String (JObject, String)
+readJSRSRest :: String -> WithError (JObject, String)
 readJSRSRest str = case str' of
         [] -> Left "JSRS parse error: empty string"
         '{':inner -> readFields inner
         _ -> Left "Must be open figure bracket"
     where str' = dropWhileWhiteSpace str
 
-readFields :: String -> Either String (JObject, String)
+readFields :: String -> WithError (JObject, String)
 readFields str = case str' of
-        '}':rest -> Right (JObject [], rest)
+        '}':rest -> Right (fromList [], rest)
         _        -> do
             (field, str'') <- readField str'
             case dropWhileWhiteSpace str'' of
-                '}':rest -> Right (JObject [field], rest)
+                '}':rest -> Right (fromList [field], rest)
                 ch:rest  -> if elem ch fieldSeps
-                            then fmap (mapFst (addField field).seqId) (readFields rest)
+                            then fmap (mapFst (insertField field).seqId) 
+                                      (readFields rest)
                             else Left "Wrong field separator"
     where str' = dropWhileWhiteSpace str
 
 
-readJValue :: String -> Either String JValue
+readJValue :: String -> WithError JValue
 readJValue str = fmap fst (readJValueRest str)
 
-readJValueRest :: String -> Either String (JValue, String)
+readJValueRest :: String -> WithError (JValue, String)
 readJValueRest str2
     | getToken "true" /= Nothing = Right (JBool True, fromJust (getToken "true"))
     | getToken "false" /= Nothing = Right (JBool False, fromJust (getToken "false"))
-    | numberStr /= [] = Right (JNumber (read numberStr), drop (length numberStr) str)
+    | numberStr /= [] = Right (readNumber numberStr, drop (length numberStr) str)
     | otherwise = case str of
-        ('\'':rest) -> fmap (mapFst JString) (readString rest)
+        ('\'':rest) -> fmap (mapFst JString) (readString '\'' rest)
+        ('"':rest) -> fmap (mapFst JString) (readString '"' rest)
         ('{':rest)  -> fmap (mapFst JObj)    (readJSRSRest str)  
         ('[':rest)  -> fmap (mapFst JArray)  (readJValues rest)
         _ -> Left "Unknown data type"
@@ -60,18 +63,27 @@ readJValueRest str2
         getToken token = if token `isPrefixOf` str
           then Just (drop (length token) str)
           else Nothing
-        numberStr = getNumber False str
-        getNumber wasDot [] = []
-        getNumber wasDot (x:str) = 
-            if isDigit x || x == '-'
-            then x:(getNumber wasDot str)
+        numberStr = getNumber str
+        genRead = if elem '.' numberStr then JDouble . read else JInt . read
+        readNumber = JNumber . genRead 
+
+        getNumber [] = []
+        getNumber (x:xs) =
+          if isDigit x || x == '-'
+          then x:(getNumber' False xs)
+          else []
+
+        getNumber' wasDot [] = []
+        getNumber' wasDot (x:str) = 
+            if isDigit x
+            then x:(getNumber' wasDot str)
             else if x == '.'
                  then if wasDot 
                       then [] 
-                      else x:(getNumber True str)
+                      else x:(getNumber' True str)
                  else []
 
-readJValues :: String -> Either String ([JValue], String)
+readJValues :: String -> WithError ([JValue], String)
 readJValues str = case str' of
         ']':rest -> Right ([], rest)
         _   -> do
@@ -84,26 +96,27 @@ readJValues str = case str' of
                 _ -> Left "No close bracket"
     where str' = dropWhileWhiteSpace str
 
-readString :: String -> Either String (String, String)
-readString ('\'':str) = Right ("", str)
-readString ('\\':x:str) = fmap (mapFst (x:)) (readString str)
-readString (ch:str) = fmap (mapFst (ch:)) (readString str)
-readString [] = Left "There is not close quote for string literal"
+readString :: Char -> String -> WithError (String, String)
+readString quote (ch:str)
+  | ch == quote = Right ("", str)
+  | ch == '\\' = readString quote str
+  | otherwise = fmap (mapFst (ch:)) (readString quote str)
+readString _ [] = Left "There is not close quote for string literal"
 
-dropSeparator :: [Char] -> String -> Either String String
+dropSeparator :: [Char] -> String -> WithError String
 dropSeparator separators str = case str' of 
         (x:rest) -> if elem x separators
                     then Right rest
                     else Left "Wrong separator"
     where str' = dropWhileWhiteSpace str
 
-dropFieldSeparator :: String -> Either String String
+dropFieldSeparator :: String -> WithError String
 dropFieldSeparator = dropSeparator fieldSeps
 
-dropNameValSeparator :: String -> Either String String
+dropNameValSeparator :: String -> WithError String
 dropNameValSeparator = dropSeparator nameValSeps 
 
-readField :: String -> Either String (JField, String)
+readField :: String -> WithError (JField, String)
 readField str = do
         (fieldName, rest) <- readFieldName str' 
         rest' <- dropNameValSeparator rest
@@ -112,7 +125,7 @@ readField str = do
     where str' = dropWhileWhiteSpace str
 
 
-readFieldName :: String -> Either String (String, String)
+readFieldName :: String -> WithError (String, String)
 readFieldName str = if validateFieldName fieldName
                   then Right (fieldName, rest)
                   else Left ("Fieldname \"" ++ fieldName++"\" is invalid")
@@ -125,9 +138,6 @@ readFieldValue = readJValueRest . dropWhileWhiteSpace
 
 mapFst :: (a -> c) -> (a, b) -> (c, b)
 mapFst fn (a, b) = (fn a, b)
-
-addField :: JField -> JObject -> JObject
-addField field (JObject fields) = JObject (field:fields)  
 
 seqId :: (NFData a) => a -> a
 seqId x = deepseq x x 
