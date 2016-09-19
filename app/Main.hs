@@ -1,6 +1,8 @@
 module Main where
 
-import Lib
+import JSTP.Parser
 
 main :: IO ()
-main = someFunc
+main = do
+  let jsrs = readJSRS "{id: 0, name: 'August' }"
+  print jsrs

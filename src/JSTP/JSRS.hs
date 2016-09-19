@@ -1,6 +1,5 @@
 module JSTP.JSRS where
 
-import Control.DeepSeq
 import qualified JSTP.ShowSettings as SS
      ( ArrayDecorator
      , arrayDecorator
@@ -9,6 +8,7 @@ import qualified JSTP.ShowSettings as SS
      , decorateArray
      )
 
+import Control.DeepSeq
 import Data.List(intercalate)
 import qualified Data.Map as M
 

@@ -3,3 +3,4 @@
 aeson*
 *.html
 Test
+.stack-work
