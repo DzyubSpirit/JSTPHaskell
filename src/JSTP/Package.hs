@@ -8,7 +8,7 @@ import Data.Maybe( fromJust
                  , fromMaybe
                  , isJust
                  )
-import qualified Data.ByteString.Char8 as B
+import qualified Data.ByteString.UTF8 as B
 import qualified Data.Map as M
 import Text.Printf
 
@@ -33,7 +33,7 @@ packageTypes =
   ]
 
 reqHandshake :: String -> B.ByteString
-reqHandshake = B.pack . printf "{handshake:[0,'%v']}"
+reqHandshake = B.fromString . printf "{handshake:[0,'%v']}"
 
 toReqPackage :: JObject -> WithError Package
 toReqPackage = toPackage' . map (mapSnd (fmap ReqInfo . )) $

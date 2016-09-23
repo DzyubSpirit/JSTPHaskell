@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 module JSTP.Connection where
 
 import Network.Simple.TCP hiding (send, recv)
@@ -7,7 +6,9 @@ import Control.Monad(when, forever)
 import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Concurrent.MVar
-import qualified Data.ByteString.Char8 as B
+import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.UTF8 as B
+
 import Data.IORef
 import Data.Either
 import Data.Maybe( maybe
@@ -24,7 +25,7 @@ import qualified JSTP.ResInfo as ResI
 import qualified JSTP.ReqInfo as ReqI
 
 separ :: B.ByteString
-separ = "\0"
+separ = B.fromString "\0"
 
 separLen = B.length separ
 
@@ -151,7 +152,7 @@ processSocket isDebug appConfig connections indexFunc (socket, addr) = do
     _ -> return ()
   fakeId <- forkIO $ return ()
   reader <- forkIO $ readLoop isDebug localData (interfaces appConfig) 
-                     interactionWays socket B.empty
+                     interactionWays socket BC.empty
   eventer <- forkIO $ eventSendingLoop isDebug socket interactionWays
   takeMVar (endSignal interactionWays)
   killThread reader
@@ -181,11 +182,11 @@ readLoop :: Bool -> TVar JObject -> [Interface]
 readLoop isDebug localData interfaces interactionWays socket buff = do
   bytes <- recv socket maxChunkSize
   callbacks' <- readTVarIO (callbackPool interactionWays)
-  let buff' = B.append buff bytes
+  let buff' = BC.append buff bytes
       (chunks, rest) = fullChunks buff'
       packages = map 
         (\el -> do
-          obj <- readJSRS (B.unpack el) 
+          obj <- readJSRS (B.toString el) 
           packageId <- takePackageId obj
           let toPackFunc = if isNothing $ lookup packageId callbacks'
                            then toReqPackage
@@ -193,15 +194,15 @@ readLoop isDebug localData interfaces interactionWays socket buff = do
           toPackFunc obj
         ) chunks
       rightPackages = rights packages
-  when (isDebug && bytes /= B.empty) $ do
+  when (isDebug && bytes /= BC.empty) $ do
     putStrLn (green "Chunks:")
-    print chunks
+    mapM_ (putStrLn . B.toString) chunks
     putStrLn (green "Packages:")
     print packages
   mapM_ ( performPackage isDebug localData interfaces interactionWays 
                          socket
         ) rightPackages
-  when (bytes == B.empty) $ threadDelay 100
+  when (bytes == BC.empty) $ threadDelay 100
   readLoop isDebug localData interfaces interactionWays socket rest
 
 performPackage :: Bool -> TVar JObject -> [Interface] -> InteractionWays
@@ -254,13 +255,13 @@ performPackage isDebug localData interfaces interactionWays socket (Package id i
 
 sendPackDel :: (Show a) => Socket -> a -> IO ()
 sendPackDel socket package = do
-  let bytes = B.pack (show package)
+  let bytes = B.fromString (show package)
   sendDel socket bytes
   return ()
 
 sendDel :: Socket -> B.ByteString -> IO ()
 sendDel socket bytes = do
-  send socket $ B.append bytes separ
+  send socket $ BC.append bytes separ 
   return ()
 
 printPackage :: Bool -> (String -> String) -> Package -> IO ()
@@ -270,9 +271,9 @@ printPackage isDebug color package = when isDebug $ do
  
 fullChunks :: B.ByteString -> ([B.ByteString], B.ByteString)
 fullChunks str = (packageStrs, rest)
-  where toTuples = iterate (B.breakSubstring separ . B.drop separLen . snd)
-        packageStrTuples = tail $ toTuples ("", B.append separ str)
-        withWhileFunc func = func (not . B.null . snd) packageStrTuples
+  where toTuples = iterate (BC.breakSubstring separ . B.drop separLen . snd)
+        packageStrTuples = tail $ toTuples (B.fromString "", BC.append separ str)
+        withWhileFunc func = func (not . BC.null . snd) packageStrTuples
         packageStrs = map fst $ withWhileFunc takeWhile
         rest = fst . head $ withWhileFunc dropWhile
 
