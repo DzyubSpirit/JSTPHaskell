@@ -35,7 +35,7 @@ instance Show JValue where
     show JUndefined = "undefined"
     show (JBool b) = if b then "true" else "false"
     show (JNumber num) = show num
-    show (JString str) = show str
+    show (JString str) = str
     show (JArray arr) = SS.decorateArray SS.arrayDecorator show arr
     show (JObj obj) = show obj
 
