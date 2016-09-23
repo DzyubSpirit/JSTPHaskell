@@ -24,7 +24,7 @@ import qualified JSTP.ResInfo as ResI
 import qualified JSTP.ReqInfo as ReqI
 
 separ :: B.ByteString
-separ = "{\f},"
+separ = "\0"
 
 separLen = B.length separ
 
@@ -260,7 +260,7 @@ sendPackDel socket package = do
 
 sendDel :: Socket -> B.ByteString -> IO ()
 sendDel socket bytes = do
-  send socket $ B.concat [bytes, ",", separ] 
+  send socket $ BC.append bytes separ
   return ()
 
 printPackage :: Bool -> (String -> String) -> Package -> IO ()
