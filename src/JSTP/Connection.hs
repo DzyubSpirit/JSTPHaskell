@@ -260,7 +260,7 @@ sendPackDel socket package = do
 
 sendDel :: Socket -> B.ByteString -> IO ()
 sendDel socket bytes = do
-  send socket $ BC.append bytes separ
+  send socket $ B.append bytes separ
   return ()
 
 printPackage :: Bool -> (String -> String) -> Package -> IO ()
