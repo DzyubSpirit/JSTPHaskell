@@ -7,9 +7,10 @@ import Data.Monoid( First(..)
 import Data.Maybe( fromJust
                  , fromMaybe
                  , isJust
+                 , isNothing
                  )
 import qualified Data.ByteString.UTF8 as B
-import qualified Data.Map as M
+import qualified Data.LinkedHashMap as M
 import Text.Printf
 
 import JSTP.JSRS
@@ -46,7 +47,7 @@ toReqPackage = toPackage' . map (mapSnd (fmap ReqInfo . )) $
 toResPackage :: JObject -> WithError Package
 toResPackage = toPackage' . map (mapSnd (fmap ResInfo . )) $
   [ ("handshake", fmap ResI.Handshake . takePackageInfo fromJString)
-  , ("callback" , fmap ResI.Callback  . takePackageInfo (return . id))
+  , ("callback" , fmap ResI.Callback  . takePackageInfo return)
   ]
 
 mapSnd f (a, b) = (a, f b)
@@ -153,7 +154,7 @@ takeReqCallInfo obj = do
   methodInfo <- maybe ( Left "No method field" ) 
                       (\(name, val) ->
                          let arr = fromJArray val
-                         in if arr == Nothing
+                         in if isNothing arr
                             then Left "Args must be an array"
                             else Right (name, fromJust arr) 
                       ) 
@@ -167,7 +168,7 @@ takeReqHandshakeInfo obj = do
   let userField = takeAnotherField "handshake" obj
   userInfo <- maybe (Right Nothing) (\(userName, val) ->
                       let userInfo = fromJString val
-                      in if userInfo == Nothing
+                      in if isNothing userInfo
                          then Left "Session hash must be a string"
                          else Right $ Just (userName, fromJust userInfo)
                     ) userField 
@@ -184,15 +185,15 @@ takeInfo obj (name, err, toInfo) =
     maybe (Left err) Right . toInfo
 
 takeError :: JValue -> Maybe IdError
-takeError (JArray ((JNumber (JInt id)):(JString msg):_)) = Just (id, msg)
+takeError (JArray (JNumber (JInt id):JString msg:_)) = Just (id, msg)
 takeError _ = Nothing
 
 takeSecondString :: JValue -> Maybe String
-takeSecondString (JArray (_:(JString str):_)) = Just str
+takeSecondString (JArray (_:JString str:_)) = Just str
 takeSecondString _ = Nothing
 
 takeFirstInt :: JValue -> Maybe Int
-takeFirstInt (JArray ((JNumber (JInt id)):_)) = Just id
+takeFirstInt (JArray (JNumber (JInt id):_)) = Just id
 takeFirstInt _ = Nothing
   
 idError = "Wrong packet id format"
@@ -223,7 +224,7 @@ instance ToJSRSable Package where
   toJSRS (Package id (ReqInfo (ReqI.Handshake interfaceName
                                               userInfoM))) = JObj . fromList $
     ("handshake", JArray [intValue id, JString interfaceName])
-    : (if isJust userInfoM then [userInfo] else [])
+    : [userInfo | isJust userInfoM]
     where (userName, sessionHash) = fromJust userInfoM
           userInfo = (userName, JString sessionHash)
   toJSRS (Package id (ReqInfo (ReqI.Call interfaceName

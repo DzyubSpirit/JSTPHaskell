@@ -25,7 +25,7 @@ import qualified JSTP.ResInfo as ResI
 import qualified JSTP.ReqInfo as ReqI
 
 separ :: B.ByteString
-separ = B.fromString "\0"
+separ = B.fromString ",{\f},"
 
 separLen = B.length separ
 

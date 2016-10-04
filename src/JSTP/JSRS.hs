@@ -10,7 +10,7 @@ import qualified JSTP.ShowSettings as SS
 
 import Control.DeepSeq
 import Data.List(intercalate)
-import qualified Data.Map as M
+import qualified Data.LinkedHashMap as M
 
 import Text.Printf
 
@@ -57,7 +57,7 @@ instance Show JObject where
 type Fieldname = String
 
 newtype JObject = JObject {
-  fromJObject :: M.Map Fieldname JValue
+  fromJObject :: M.LinkedHashMap Fieldname JValue
 } deriving (Eq)
 
 instance NFData JObject where
@@ -104,10 +104,9 @@ doubleValue :: Double -> JValue
 doubleValue = JNumber . JDouble
 
 takeValueWith :: JObject -> String -> (JValue -> a) -> Maybe a
-takeValueWith obj str func = fmap func 
-                           $ takeValue obj str
+takeValueWith obj str func = func <$> takeValue obj str
 
-type Hash = M.Map String
+type Hash = M.LinkedHashMap String
 modifyJObject :: (Hash JValue -> Hash JValue) -> JObject -> JObject
 modifyJObject f = JObject . f. fromJObject
 

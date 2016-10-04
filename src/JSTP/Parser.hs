@@ -2,17 +2,17 @@ module JSTP.Parser(readJSRS
                   ,readJValue
                   ) where
 
-import JSTP.ParserSettings(validateFieldName
-                          ,dropWhileWhiteSpace
-                          ,nameValSeps
-                          ,fieldSeps
-                          ,whiteSpaceChars
-                          ,slashCombos
-                          ,valueSeps
+import JSTP.ParserSettings( validateFieldName
+                          , dropWhileWhiteSpace
+                          , nameValSeps
+                          , fieldSeps
+                          , whiteSpaceChars
+                          , slashCombos
+                          , valueSeps
                           )
 
 import Data.List(isPrefixOf)
-import Data.Maybe(fromJust)
+import Data.Maybe(fromJust, isJust)
 import Data.Char(isDigit)
 import qualified Data.Map as M
 import Control.DeepSeq
@@ -37,7 +37,7 @@ readFields str = case str' of
             (field, str'') <- readField str'
             case dropWhileWhiteSpace str'' of
                 '}':rest -> Right (fromList [field], rest)
-                ch:rest  -> if elem ch fieldSeps
+                ch:rest  -> if ch `elem` fieldSeps
                             then fmap (mapFst (insertField field).seqId) 
                                       (readFields rest)
                             else Left "Wrong field separator"
@@ -49,8 +49,8 @@ readJValue str = fmap fst (readJValueRest str)
 
 readJValueRest :: String -> WithError (JValue, String)
 readJValueRest str2
-    | getToken "true" /= Nothing = Right (JBool True, fromJust (getToken "true"))
-    | getToken "false" /= Nothing = Right (JBool False, fromJust (getToken "false"))
+    | isJust $ getToken "true" = Right (JBool True, fromJust (getToken "true"))
+    | isJust $ getToken "false" = Right (JBool False, fromJust (getToken "false"))
     | numberStr /= [] = Right (readNumber numberStr, drop (length numberStr) str)
     | otherwise = case str of
         ('\'':rest) -> fmap (mapFst JString) (readString '\'' rest)
@@ -64,24 +64,22 @@ readJValueRest str2
           then Just (drop (length token) str)
           else Nothing
         numberStr = getNumber str
-        genRead = if elem '.' numberStr then JDouble . read else JInt . read
+        genRead = if '.' `elem` numberStr then JDouble . read else JInt . read
         readNumber = JNumber . genRead 
 
         getNumber [] = []
         getNumber (x:xs) =
           if isDigit x || x == '-'
-          then x:(getNumber' False xs)
+          then x : getNumber' False xs
           else []
 
         getNumber' wasDot [] = []
-        getNumber' wasDot (x:str) = 
-            if isDigit x
-            then x:(getNumber' wasDot str)
-            else if x == '.'
-                 then if wasDot 
-                      then [] 
-                      else x:(getNumber' True str)
-                 else []
+        getNumber' wasDot (x:str)
+          | isDigit x = x : getNumber' wasDot str
+          | x == '.' = if wasDot 
+                       then [] 
+                       else x : getNumber' True str
+          | otherwise = []
 
 readJValues :: String -> WithError ([JValue], String)
 readJValues str = case str' of
@@ -90,7 +88,7 @@ readJValues str = case str' of
             (value, str') <- readJValueRest str
             case dropWhileWhiteSpace str' of
                 ']':rest -> Right ([value], rest)
-                ch:rest -> if elem ch valueSeps
+                ch:rest -> if ch `elem` valueSeps
                            then fmap (mapFst (value:)) (readJValues rest)
                            else Left "Wrong value separator"
                 _ -> Left "No close bracket"
@@ -103,9 +101,9 @@ readString quote (ch:str)
   | otherwise = fmap (mapFst (ch:)) (readString quote str)
 readString _ [] = Left "There is not close quote for string literal"
 
-dropSeparator :: [Char] -> String -> WithError String
+dropSeparator :: String -> String -> WithError String
 dropSeparator separators str = case str' of 
-        (x:rest) -> if elem x separators
+        (x:rest) -> if x `elem` separators
                     then Right rest
                     else Left "Wrong separator"
     where str' = dropWhileWhiteSpace str
