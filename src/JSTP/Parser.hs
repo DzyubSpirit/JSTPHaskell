@@ -14,7 +14,7 @@ import JSTP.ParserSettings( validateFieldName
 import Data.List(isPrefixOf)
 import Data.Maybe(fromJust, isJust)
 import Data.Char(isDigit)
-import qualified Data.Map as M
+import qualified Data.LinkedHashMap as M
 import Control.DeepSeq
 
 import JSTP.JSRS
@@ -26,19 +26,19 @@ readJSRS = fmap fst . readJSRSRest
 readJSRSRest :: String -> WithError (JObject, String)
 readJSRSRest str = case str' of
         [] -> Left "JSRS parse error: empty string"
-        '{':inner -> readFields inner
+        '{':inner -> mapFst (JObject . M.fromList) <$> readFields inner
         _ -> Left "Must be open figure bracket"
     where str' = dropWhileWhiteSpace str
 
-readFields :: String -> WithError (JObject, String)
+readFields :: String -> WithError ([JField], String)
 readFields str = case str' of
-        '}':rest -> Right (fromList [], rest)
+        '}':rest -> Right ([], rest)
         _        -> do
             (field, str'') <- readField str'
             case dropWhileWhiteSpace str'' of
-                '}':rest -> Right (fromList [field], rest)
+                '}':rest -> Right ([field], rest)
                 ch:rest  -> if ch `elem` fieldSeps
-                            then fmap (mapFst (insertField field).seqId) 
+                            then fmap (mapFst (field:)) 
                                       (readFields rest)
                             else Left "Wrong field separator"
     where str' = dropWhileWhiteSpace str
