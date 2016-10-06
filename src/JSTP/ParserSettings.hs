@@ -13,8 +13,8 @@ nameValSeps = [':']
 fieldSeps = [',']
 valueSeps = [',']
 ------
-engLetters = ['a'..'z']++['A'..'Z']
-otherChars = ['0'..'9']++engLetters
+engLetters = ['a'..'z'] ++ ['A'..'Z']
+otherChars = '_' : ['0'..'9'] ++ engLetters
 filterForWord = repeat otherChars 
 ------
 slashCombos = []
