@@ -14,6 +14,8 @@ import qualified Data.LinkedHashMap as M
 
 import Text.Printf
 
+import JSTP.ParserSettings(hasEscapeChars)
+
 data JValue = JObj JObject
             | JArray [JValue]
             | JNumber JNumber
@@ -53,6 +55,9 @@ instance Show JObject where
                        , show jval
                        ]
                ) $ takeFields obj
+      where transform fieldname
+              | hasEscapeChars fieldname = concat ["'", fieldname, "'"]
+              | otherwise                = fieldname
 
 type Fieldname = String
 

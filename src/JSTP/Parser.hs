@@ -124,10 +124,8 @@ readField str = do
 
 
 readFieldName :: String -> WithError (String, String)
-readFieldName str = if validateFieldName fieldName
-                  then Right (fieldName, rest)
-                  else Left ("Fieldname \"" ++ fieldName++"\" is invalid")
-    where delChars = nameValSeps++whiteSpaceChars
+readFieldName str = (\x -> (x, rest)) <$> validateFieldName fieldName 
+    where delChars = nameValSeps ++ whiteSpaceChars
           fieldName = takeWhile (`notElem` delChars) str
           rest = dropWhile (`notElem` delChars) str
 

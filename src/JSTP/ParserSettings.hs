@@ -6,7 +6,10 @@ module JSTP.ParserSettings
     , valueSeps
     , whiteSpaceChars
     , slashCombos
+    , hasEscapeChars
     ) where
+
+import JSTP.Errors
 
 whiteSpaceChars = [' ', '\t', '\n', '\r']
 nameValSeps = [':']
@@ -19,10 +22,21 @@ filterForWord = repeat otherChars
 ------
 slashCombos = []
 ------
-validateFieldName :: String -> Bool
-validateFieldName [] = False
-validateFieldName str = all (uncurry elem) (zip str filterForWord)
-                
+validateFieldName :: String -> WithError String
+validateFieldName []  = Left "Fieldname can not be empty"
+validateFieldName [x]
+  | x `elem` otherChars = Right [x]
+  | otherwise = fieldNameParseError
+validateFieldName str
+  | hasEscapeChars str = Right str
+  | fChar `elem` "'\"" && fChar == lChar = Right fieldname
+  | otherwise = fieldNameParseError
+  where fChar = head str
+        fieldname = init $ tail str
+        lChar = last $ tail str
+
+hasEscapeChars :: String -> Bool
+hasEscapeChars = all (uncurry elem) . (`zip` filterForWord) 
 
 dropWhileWhiteSpace :: String -> String
 dropWhileWhiteSpace = dropWhile (`elem` whiteSpaceChars)

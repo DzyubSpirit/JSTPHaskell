@@ -6,3 +6,5 @@ type ErrorMessage = String
 
 type WithError = Either String
 type WithIdError = Either IdError
+
+fieldNameParseError = Left "Fieldname contains restricted characters" 
