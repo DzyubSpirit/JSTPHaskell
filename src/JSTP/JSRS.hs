@@ -50,7 +50,7 @@ instance Show JNumber where
 instance Show JObject where
     show obj = SS.decorateArray SS.objectDecorator 
                (\(fieldname, jval) -> concat 
-                       [ fieldname
+                       [ transform fieldname
                        , ":"
                        , show jval
                        ]
