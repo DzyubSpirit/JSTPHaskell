@@ -28,7 +28,7 @@ validateFieldName [x]
   | x `elem` otherChars = Right [x]
   | otherwise = fieldNameParseError
 validateFieldName str
-  | hasEscapeChars str = Right str
+  | not $ hasEscapeChars str = Right str
   | fChar `elem` "'\"" && fChar == lChar = Right fieldname
   | otherwise = fieldNameParseError
   where fChar = head str
@@ -36,7 +36,7 @@ validateFieldName str
         lChar = last $ tail str
 
 hasEscapeChars :: String -> Bool
-hasEscapeChars = all (uncurry elem) . (`zip` filterForWord) 
+hasEscapeChars = not . all (uncurry elem) . (`zip` filterForWord) 
 
 dropWhileWhiteSpace :: String -> String
 dropWhileWhiteSpace = dropWhile (`elem` whiteSpaceChars)
