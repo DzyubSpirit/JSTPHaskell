@@ -1,6 +1,7 @@
 module JSTP.ShowSettings where
 
 import Data.List(intercalate)
+import Data.Char(isAlphaNum)
 
 data ArrayDecorator = ArrayDecorator {
     start :: String,
@@ -25,3 +26,5 @@ objectDecorator = ArrayDecorator {
 }
 
 fieldNameValueSeparator = ":"
+
+hasEscapeChars = and . map isAlphaNum

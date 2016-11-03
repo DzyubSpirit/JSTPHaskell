@@ -6,6 +6,7 @@ import Control.Monad(when, forever)
 import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Concurrent.MVar
+import Control.Arrow(left)
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.UTF8 as B
 
@@ -184,9 +185,11 @@ readLoop isDebug localData interfaces interactionWays socket buff = do
   callbacks' <- readTVarIO (callbackPool interactionWays)
   let buff' = BC.append buff bytes
       (chunks, rest) = fullChunks buff'
+      takeObject (JObj obj) = Right obj
+      takeObject _             = Left "Package must be the object"
       packages = map 
         (\el -> do
-          obj <- readJSRS (B.toString el) 
+          obj <- left show (parse (B.toString el)) >>= takeObject
           packageId <- takePackageId obj
           let toPackFunc = if isNothing $ lookup packageId callbacks'
                            then toReqPackage

@@ -12,6 +12,7 @@ import Data.Maybe( fromJust
 import qualified Data.ByteString.UTF8 as B
 import qualified Data.LinkedHashMap as M
 import Text.Printf
+import Text.ParserCombinators.Parsec(ParseError)
 
 import JSTP.JSRS
 import JSTP.Errors
@@ -52,36 +53,6 @@ toResPackage = toPackage' . map (mapSnd (fmap ResInfo . )) $
 
 mapSnd f (a, b) = (a, f b)
   
-{-
-toPackage :: JObject -> WithError Package
-toPackage obj = fromMaybe (Left "Uknown package type") 
-              . getFirst . mconcat 
-              . map (First . takePackage obj) 
-              . makePkgInfos $ 
-  [ ( "handshake"
-    , Just $ fmap (uncurry ReqI.Handshake) . takeReqHandshakeInfo
-    , Just $ fmap ResI.Handshake . takePackageInfo fromJString
-    )
-  , ( "inspect"
-    , Just $ fmap ReqI.Inspect . takeReqInspectInfo
-    , Nothing
-    )
-  , ( "call"
-    , Just $ fmap (uncurry ReqI.Call) . takeReqCallInfo
-    , Nothing
-    )
-  , ( "callback"
-    , Nothing
-    , Just $ fmap ResI.Callback  . takePackageInfo (return . id)
-    )
-  ]
-  where makePkgInfos = map (mapSnd fromJust)
-                     . filter (isJust . snd) . concat
-                     . map (\(a, b, c) -> [ (a, fmap (fmap ReqInfo . ) b)
-                                          , (a, fmap (fmap ResInfo . ) c)
-                                          ])
--}
-
 toPackage' :: [(Fieldname, JObject -> WithError PackageInfo)] 
            -> JObject -> WithError Package
 toPackage' infoFuncs obj = fromMaybe (Left "Uknown package type") 
@@ -185,7 +156,7 @@ takeInfo obj (name, err, toInfo) =
     maybe (Left err) Right . toInfo
 
 takeError :: JValue -> Maybe IdError
-takeError (JArray (JNumber (JInt id):JString msg:_)) = Just (id, msg)
+takeError (JArray ((JNumber id):JString msg:_)) = Just (floor id, msg)
 takeError _ = Nothing
 
 takeSecondString :: JValue -> Maybe String
@@ -193,7 +164,7 @@ takeSecondString (JArray (_:JString str:_)) = Just str
 takeSecondString _ = Nothing
 
 takeFirstInt :: JValue -> Maybe Int
-takeFirstInt (JArray (JNumber (JInt id):_)) = Just id
+takeFirstInt (JArray ((JNumber id):_)) = Just $ floor id
 takeFirstInt _ = Nothing
   
 idError = "Wrong packet id format"
@@ -207,7 +178,7 @@ instance ToJSRSable Package where
     ]
     where resField = case info of
             Right hash -> ("ok", JString hash)
-            Left (errId, errMsg) -> ("error", JArray [ JNumber (JInt errId)
+            Left (errId, errMsg) -> ("error", JArray [ intValue errId
                                                      , JString errMsg
                                                      ])  
   toJSRS (Package id (ResInfo (ResI.Callback info))) = JObj $ fromList 
@@ -216,7 +187,7 @@ instance ToJSRSable Package where
     ]
     where resField = case info of
             Right val -> ("ok", val)
-            Left (errId, errMsg) -> ("error", JArray [ JNumber (JInt errId)
+            Left (errId, errMsg) -> ("error", JArray [ intValue errId
                                                      , JString errMsg
                                                      ])  
   toJSRS (Package id (ReqInfo (ReqI.Inspect interfaceName))) = JObj $ fromList 
