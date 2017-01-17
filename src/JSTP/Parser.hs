@@ -1,5 +1,5 @@
-module JSTP.Parser( JSTP.Parser.parse
-                  ) where
+module JSTP.Parser {-( JSTP.Parser.parse
+                   )-} where
 
 import Text.ParserCombinators.Parsec as P
 import Numeric
@@ -14,8 +14,8 @@ pBool = JBool <$>  (  True  <$ string "true"
                   <|> False <$ string "false"
                    ) <?> "Wrong boolean format"
 
-pValue = spaces *> choice [pObject, pArray, pNumber, pBool, pNumber, pUndefined, pNull]
-      <?> "Wrong value format"
+pValue = spaces *> choice [pObject, pArray, pNumber, pBool, pString, pUndefined, pNull]
+      <?> "javascript value"
 
 pArray  = JArray   <$> pSeries '[' ']' pValue
 pObject = (JObj . fromList <$>) . pSeries '{' '}' 
@@ -33,18 +33,20 @@ pString = JString <$> pString'
 pUndefined = JUndefined <$ string "undefined"
 pNull = JNull <$ string "null"
 
-pName =  many alphaNum <|> pString' <?> "Wrong name format"
+pName =   pString' <|> many1 alphaNum
 
 pString' :: Parser String
-pString' =  between' ('"', '\'')
-        <|> between' ('\'', '"')
-        <?> "Wrong string format"
-  where between' (outQ, inQ) = between (char outQ) (char outQ) (many $ jchar inQ)
-        jchar quote =  char '\\' *> (pEscape quote <|> pUnicode)
-                   <|> satisfy (`notElem` ['\\', quote])
+pString' =  between' '"'
+        <|> between' '\''
+
+between' quote = between (char quote) (char quote) (many $ jchar quote)
+jchar quote =  char '\\' *> (pEscape quote <|> pUnicode)
+           <|> satisfy (`notElem` ['\\', quote])
  
 pEscape :: Char -> Parser Char
-pEscape quote = choice (zipWith (\c r -> r <$ char c) (quote:"bnfrt\\\"/") (quote:"\b\n\f\r\t\\/"))
+pEscape quote = choice (zipWith (\c r -> r <$ char c) (quote:"bnfrt\\\"/")
+                                                      (quote:"\b\n\f\r\t\\/")
+                       )
 
 pUnicode :: Parser Char
 pUnicode = char 'u' *> (decode <$> count 4 hexDigit)
