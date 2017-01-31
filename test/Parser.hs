@@ -15,7 +15,7 @@ instance Arbitrary JValue where
           null       = return JNull
           undefined  = return JUndefined
           string     = fmap JString arbitrary
-          number     = fmap JNumber arbitrary
+          number     = oneof [fmap JDouble arbitrary, fmap JInt arbitrary]
           elementary = [number, string, bool, undefined, null]
           recursive  = [array, object]
           array      = fmap JArray $ sized vector

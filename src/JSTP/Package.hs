@@ -1,25 +1,96 @@
 module JSTP.Package where
 
-import Data.Functor((<$>))
-import Data.Monoid( First(..)
-                  , mconcat
+import Control.Lens ((^?), ix)
+import Control.Monad (unless)
+import Control.Monad.Catch (MonadThrow)
+import Data.LinkedHashMap as M 
+import Data.List as L
+import Data.String
+import Data.Text as T
+import Data.ByteString (ByteString)
+import Data.Attoparsec.Text as A
+import Data.Conduit
+import Data.Conduit.Combinators as C
+import Data.Word8 as W8
+import Data.Conduit.Network
+
+import Prelude as P
+
+import JSTP.JSRS
+import JSTP.Parser
+
+makeServer = runTCPServer (serverSettings 8080 $ fromString "127.0.0.1")
+           $ \appData -> appSource appData $$ omapE W8.toUpper =$ appSink appData
+                          
+
+data Package = Package
+  { header   :: PackageHeader
+  , category :: String
+  , info     :: Maybe JField
+  } deriving (Show)
+
+data PackageHeader = PackageHeader
+  { getId :: Int
+  , getResourceId :: Maybe String
+  } deriving (Show)
+
+type PackageFormatError = String
+
+toPackage :: JObject -> Either PackageFormatError Package
+toPackage (JObject fieldsMap) = do
+  (category, header) <- fromMaybeE fieldsCountErr headerField
+  pHeader            <- fromMaybeE headerErr
+                        $ fromJArray header >>= toPackageHeader
+  return $ Package pHeader category info
+    where headerField    = toList fieldsMap ^? ix 0
+          info           = toList fieldsMap ^? ix 1
+          fieldsCountErr = "Package must have one or two fields"
+          headerErr      = "Header must be array with one or two elements"
+
+toPackageHeader :: [JValue] -> Maybe PackageHeader
+toPackageHeader arr@((JInt id):_) =
+  Just $ PackageHeader id $ arr ^? ix 1 >>= fromJString
+toPackageHeader _                 = Nothing
+  
+packageParser :: (Monad m, MonadThrow m) =>
+  Conduit ByteString m (Result (Either PackageFormatError Package))
+packageParser = fuse C.decodeUtf8 . fuse (splitC (== '\0')) . C.map
+              $ A.parse (toPackage <$> (skipSpace *> pObject))
+
+splitC :: Monad m => (Char -> Bool) -> Conduit Text m Text
+splitC isCh = split' T.empty
+  where split' acc = await >>= maybe (return ())
+          (\text -> do
+            let chunks = T.split isCh text
+            P.mapM_ yield (P.init chunks)
+            split' $ P.last chunks
+          )
+
+fromMaybeE :: a -> Maybe b -> Either a b
+fromMaybeE x = maybe (Left x) Right
+
+maybeE :: a -> (b -> c) -> Maybe b -> Either a c
+maybeE x f = maybe (Left x) (Right . f)
+
+{-
+import Data.Functor ((<$>))
+import Data.Monoid ( First(..)
+                   , mconcat
+                   )
+import Data.Maybe ( fromJust
+                  , fromMaybe
+                  , isJust
+                  , isNothing
                   )
-import Data.Maybe( fromJust
-                 , fromMaybe
-                 , isJust
-                 , isNothing
-                 )
 import qualified Data.ByteString.UTF8 as B
 import qualified Data.LinkedHashMap as M
 import Text.Printf
-import Text.ParserCombinators.Parsec(ParseError)
+import Text.ParserCombinators.Parsec (ParseError)
 
 import JSTP.JSRS
 import JSTP.Errors
 import qualified JSTP.ResInfo as ResI
 import qualified JSTP.ReqInfo as ReqI
-
-data Package = Package Int PackageInfo 
 
 data PackageInfo = ResInfo ResI.ResInfo
                  | ReqInfo ReqI.ReqInfo
@@ -27,7 +98,7 @@ data PackageInfo = ResInfo ResI.ResInfo
 data ReqOrRes = Request | Response
 
 packageTypes :: [PackageFieldname]
-packageTypes = 
+packageTypes =
   [ "handshake"
   , "inspect"
   , "call"
@@ -207,3 +278,4 @@ instance ToJSRSable Package where
 
 instance Show Package where
   show = show . toJSRS
+-}

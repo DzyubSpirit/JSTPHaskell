@@ -1,44 +1,56 @@
-module JSTP.Parser {-( JSTP.Parser.parse
-                   )-} where
+{-# LANGUAGE OverloadedStrings #-}
+module JSTP.Parser ( JSTP.Parser.parse
+                   , pValue
+                   , pObject
+                   ) where
 
-import Text.ParserCombinators.Parsec as P
+import Data.Attoparsec.Text as P
+import Data.Attoparsec.Combinator
+import Data.Char (isAlphaNum, isHexDigit)
+import Control.Applicative
 import Numeric
 
 import JSTP.JSRS
 
-parse :: String -> Either ParseError JValue
-parse = P.parse pValue "jsrs parser"
+parse = eitherResult . P.parse pValue
 
-pValue, pBool, pObject, pArray, pNumber, pUndefined, pNull :: Parser JValue
-pBool = JBool <$>  (  True  <$ string "true"
-                  <|> False <$ string "false"
-                   ) <?> "Wrong boolean format"
+pPackage = pValue <* char '\0'
 
-pValue = spaces *> choice [pObject, pArray, pNumber, pBool, pString, pUndefined, pNull]
-      <?> "javascript value"
+pValue:: Parser JValue
+pValue = skipSpace *> choice 
+  [ JObj    <$> pObject
+  , JArray  <$> pArray
+  , JInt    <$> signed decimal
+  , JDouble <$> double
+  , JBool   <$> pBool
+  , JString <$> pString
+  , pUndefined
+  , pNull
+  ] <?> "javascript value"
 
-pArray  = JArray   <$> pSeries '[' ']' pValue
-pObject = (JObj . fromList <$>) . pSeries '{' '}' 
-        $ (,) <$> (spaces *> pName)
-              <*> (spaces *> char ':' *> spaces *> pValue)
+pBool :: Parser Bool
+pBool = (  True  <$ string "true"
+       <|> False <$ string "false"
+        ) <?> "Wrong boolean format"
 
-pNumber = do
-  s <- getInput
-  case readSigned readFloat s of
-    (n, s'):_ -> JNumber n <$ setInput s'
-    _         -> fail "Wrong number format"
+pArray :: Parser [JValue]
+pArray  = pSeries '[' ']' pValue
 
-pString = JString <$> pString'
-       
+pObject :: Parser JObject
+pObject = (fromList <$>) . pSeries '{' '}' 
+        $ (,) <$> (skipSpace *> pName)
+              <*> (skipSpace *> char ':' *> skipSpace *> pValue)
+
+pUndefined, pNull :: Parser JValue
 pUndefined = JUndefined <$ string "undefined"
 pNull = JNull <$ string "null"
 
-pName =   pString' <|> many1 alphaNum
+pName, pString :: Parser String
+pName = pString <|> many1 (satisfy isAlphaNum)
+pString =  between' '"'
+       <|> between' '\''
 
-pString' :: Parser String
-pString' =  between' '"'
-        <|> between' '\''
-
+between open close p = open >> p <* close
 between' quote = between (char quote) (char quote) (many $ jchar quote)
 jchar quote =  char '\\' *> (pEscape quote <|> pUnicode)
            <|> satisfy (`notElem` ['\\', quote])
@@ -49,9 +61,9 @@ pEscape quote = choice (zipWith (\c r -> r <$ char c) (quote:"bnfrt\\\"/")
                        )
 
 pUnicode :: Parser Char
-pUnicode = char 'u' *> (decode <$> count 4 hexDigit)
+pUnicode = char 'u' *> (decode <$> count 4 (satisfy isHexDigit))
   where decode = toEnum . fst . (!! 0) . readHex
 
 pSeries :: Char -> Char -> Parser a -> Parser [a]
-pSeries left right parser = between (char left) (spaces *> char right)
-                          $ (spaces *> parser) `sepBy` (spaces *> char ',')
+pSeries left right parser = between (char left) (skipSpace *> char right)
+                          $ (skipSpace *> parser) `sepBy` (skipSpace *> char ',')
